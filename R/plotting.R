@@ -13,8 +13,8 @@
 #' plot_waterfall(x)
 #'
 #' @importFrom ggplot2 ggplot aes .data geom_rect geom_hline labs
-#'   scale_x_reverse expansion guides theme_bw theme element_blank element_text
-#'   element_line
+#'   scale_x_reverse scale_y_continuous expansion guides theme_bw theme
+#'   element_blank element_text element_line margin unit
 #'
 #' @export
 plot_waterfall <- function(x, title = "") {
@@ -31,14 +31,17 @@ plot_waterfall <- function(x, title = "") {
     geom_hline(yintercept = c(0)) +
     labs(x = "", y = "Change from baseline (%)", title = title) +
     scale_x_reverse(expand = expansion(mult = 0.01)) +
+    scale_y_continuous(breaks = c(-100, -75, -50, -25, 0, 25, 50, 75, 100),
+                       limits = c(-100, 100)) +
     guides(fill = "none") +
-    theme_bw(base_size = 12) +
-    theme(panel.grid = element_blank(),
-          plot.title = element_text(hjust = 0.5),
-          axis.text.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text = element_text(colour = "black", size = 11),
-          axis.title = element_text(size = 12),
+    theme_bw(base_size = 16, base_family = "sans") +
+    theme(legend.position = c(0.8, 0.88),
+          plot.margin = margin(7, 10, 7, 7),
+          panel.grid = element_blank(),
+          legend.key.size = unit(0.5, "cm"),
+          legend.text = element_text(size = 14),
+          axis.text = element_text(colour = "black", size = 14),
+          axis.title = element_text(size = 16),
           panel.border = element_blank(),
           axis.line = element_line(colour = "black", size = 0.5))
   p
@@ -51,7 +54,8 @@ plot_waterfall <- function(x, title = "") {
 #'
 #' @param x1 Vector of best tumor size changes for treatment 1.
 #' @param x2 Vector of best tumor size changes for treatment 2.
-#' @param names
+#' @param name1 Name for treatment 1.
+#' @param name2 Name for treatment 2.
 #' @param hline Y-coordinate for dotted line.
 #'
 #' @return A ggplot step plot.
@@ -61,13 +65,27 @@ plot_waterfall <- function(x, title = "") {
 #' x2 <- sample(-100:100, 20)
 #' plot_waterfall_curve(x1, x2)
 #'
-#' @importFrom ggplot2 ggplot aes .data geom_rect geom_hline labs
-#'   scale_x_reverse expansion guides theme_bw theme element_blank element_text
-#'   element_line
+#' @importFrom ggplot2 ggplot aes .data geom_step scale_colour_manual geom_hline
+#'   scale_x_reverse scale_y_continuous coord_cartesian labs theme_bw theme
+#'   element_blank element_text element_line margin unit
+#' @importFrom dplyr .data bind_rows mutate group_by slice n
+#' @importFrom stats setNames
 #'
 #' @export
-plot_waterfall_curve <- function(x1, x2 = NULL, hline = 0) {
-  ggplot(df, aes(ind, PCHG, colour = Treatment)) +
+plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
+                                 name2 = "Control", hline = 0) {
+  x1 <- sort(x1, decreasing = TRUE)
+  x2 <- sort(x2, decreasing = TRUE)
+  df <- bind_rows(setNames(list(data.frame(PCHG = x1), data.frame(PCHG = x2)),
+                     c(name1, name2)),
+            .id = "Treatment") %>%
+    mutate(Treatment = factor(.data$Treatment,
+                              levels = c(name1, name2))) %>%
+    group_by(.data$Treatment) %>%
+    slice(c(1:n(), n())) %>%
+    mutate(ind = round((1-0:(n()-1)/(n()-1))*100, 1),
+           PCHG = round(.data$PCHG))
+  ggplot(df, aes(.data$ind, .data$PCHG, colour = .data$Treatment)) +
     geom_step(size = 0.8) +
     scale_colour_manual(values = c("#6585b4", "#aacc6f")) +
     geom_hline(yintercept = 0) +
