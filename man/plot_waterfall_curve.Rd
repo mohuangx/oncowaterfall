@@ -9,19 +9,25 @@ plot_waterfall_curve(
   x2 = NULL,
   name1 = "Treatment",
   name2 = "Control",
-  hline = 0
+  hline = 0,
+  include_diff = TRUE,
+  conf_level = 0.95
 )
 }
 \arguments{
-\item{x1}{Vector of best tumor size changes for treatment 1.}
+\item{x1}{Vector of best tumor size changes for treatment 1}
 
-\item{x2}{Vector of best tumor size changes for treatment 2.}
+\item{x2}{Vector of best tumor size changes for treatment 2}
 
-\item{name1}{Name for treatment 1.}
+\item{name1}{Name for treatment 1}
 
-\item{name2}{Name for treatment 2.}
+\item{name2}{Name for treatment 2}
 
-\item{hline}{Y-coordinate for dotted line.}
+\item{hline}{Y-coordinate for dotted line}
+
+\item{include_diff}{Whether to include difference in proportions plot}
+
+\item{conf_level}{Confidence level for difference in proportions plot}
 }
 \value{
 A ggplot step plot.

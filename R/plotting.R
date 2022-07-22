@@ -34,14 +34,13 @@ plot_waterfall <- function(x, title = "") {
     scale_y_continuous(breaks = c(-100, -75, -50, -25, 0, 25, 50, 75, 100),
                        limits = c(-100, 100)) +
     guides(fill = "none") +
-    theme_bw(base_size = 16, base_family = "sans") +
+    theme_bw(base_size = 14) +
     theme(legend.position = c(0.8, 0.88),
           plot.margin = margin(7, 10, 7, 7),
           panel.grid = element_blank(),
           legend.key.size = unit(0.5, "cm"),
-          legend.text = element_text(size = 14),
-          axis.text = element_text(colour = "black", size = 14),
-          axis.title = element_text(size = 16),
+          axis.text = element_text(colour = "black", size = 11),
+          axis.title = element_text(face = "bold", size = 12),
           panel.border = element_blank(),
           axis.line = element_line(colour = "black", size = 0.5))
   p
@@ -52,11 +51,13 @@ plot_waterfall <- function(x, title = "") {
 #' \code{plot_waterfall_curve} returns a ggplot object which presents best tumor
 #' size change as a step function rather than the typical waterfall bar plot.
 #'
-#' @param x1 Vector of best tumor size changes for treatment 1.
-#' @param x2 Vector of best tumor size changes for treatment 2.
-#' @param name1 Name for treatment 1.
-#' @param name2 Name for treatment 2.
-#' @param hline Y-coordinate for dotted line.
+#' @param x1 Vector of best tumor size changes for treatment 1
+#' @param x2 Vector of best tumor size changes for treatment 2
+#' @param name1 Name for treatment 1
+#' @param name2 Name for treatment 2
+#' @param hline Y-coordinate for dotted line
+#' @param include_diff Whether to include difference in proportions plot
+#' @param conf_level Confidence level for difference in proportions plot
 #'
 #' @return A ggplot step plot.
 #'
@@ -70,10 +71,12 @@ plot_waterfall <- function(x, title = "") {
 #'   element_blank element_text element_line margin unit
 #' @importFrom dplyr .data bind_rows mutate group_by slice n
 #' @importFrom stats setNames
+#' @importFrom patchwork plot_layout
 #'
 #' @export
 plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
-                                 name2 = "Control", hline = 0) {
+                                 name2 = "Control", hline = 0,
+                                 include_diff = TRUE, conf_level = 0.95) {
   x1 <- sort(x1, decreasing = TRUE)
   x2 <- sort(x2, decreasing = TRUE)
   df <- bind_rows(setNames(list(data.frame(PCHG = x1), data.frame(PCHG = x2)),
@@ -85,7 +88,7 @@ plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
     slice(c(1:n(), n())) %>%
     mutate(ind = round((1-0:(n()-1)/(n()-1))*100, 1),
            PCHG = round(.data$PCHG))
-  ggplot(df, aes(.data$ind, .data$PCHG, colour = .data$Treatment)) +
+  p1 <- ggplot(df, aes(.data$ind, .data$PCHG, colour = .data$Treatment)) +
     geom_step(size = 0.8) +
     scale_colour_manual(values = c("#6585b4", "#aacc6f")) +
     geom_hline(yintercept = 0) +
@@ -96,14 +99,79 @@ plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
     labs(y = "Change from Baseline (%)",
          x = "Proportion of Patients (%)", fill = "",
          colour = "") +
-    theme_bw(base_size = 16, base_family = "sans") +
+    theme_bw(base_size = 14) +
     theme(legend.position = c(0.8, 0.88),
           plot.margin = margin(7, 10, 7, 7),
           panel.grid = element_blank(),
           legend.key.size = unit(0.5, "cm"),
-          legend.text = element_text(size = 14),
-          axis.text = element_text(colour = "black", size = 14),
-          axis.title = element_text(size = 16),
+          axis.text = element_text(colour = "black", size = 11),
+          axis.title = element_text(face = "bold", size = 12),
           panel.border = element_blank(),
           axis.line = element_line(colour = "black", size = 0.5))
+  if (include_diff & !is.null(x2)) {
+    p2 <- plot_waterfall_diff(x1, x2, name1, name2, conf_level, hline)
+    p <- p1 + p2 + plot_layout(widths = c(2, 1))
+    p
+  } else {
+    p1
+  }
+}
+
+
+#' Plots rate difference between waterfall curves
+#'
+#' \code{plot_waterfall_diff} returns a ggplot object which is the rate
+#' difference of two waterfall curves across the range of best tumor size
+#' change.
+#'
+#' @param x1 Vector of best tumor size changes for treatment 1
+#' @param x2 Vector of best tumor size changes for treatment 2
+#' @param name1 Name for treatment 1
+#' @param name2 Name for treatment 2
+#' @param conf_level Confidence level
+#' @param hline Y-coordinate for dotted line
+#'
+#' @return A ggplot step plot.
+#'
+#' @examples
+#' x1 <- sample(-100:100, 25)
+#' x2 <- sample(-100:100, 20)
+#' plot_waterfall_diff(x1, x2)
+#'
+#' @importFrom ggplot2 ggplot aes .data geom_step geom_ribbon annotate arrow
+#'   scale_colour_manual geom_hline geom_vline scale_x_continuous
+#'   scale_y_continuous coord_flip labs theme_bw theme element_blank
+#'   element_text element_line margin unit
+#' @importFrom dplyr .data bind_rows mutate group_by slice n across
+#' @importFrom stats setNames
+#'
+#' @export
+plot_waterfall_diff <- function(x1, x2, name1 = "Treatment", name2 = "Control",
+                                conf_level = 0.95, hline = 0) {
+  df_diff <- ecdf_diff(x1, x2, conf_level = conf_level) %>%
+    mutate(across(.data$Est:.data$UCL, ~ round(.x*100, 1)))
+  xmin <- -max(abs(df_diff$LCL), abs(df_diff$UCL))
+  xmax <- -xmin
+  ggplot(df_diff) + geom_step(aes(.data$Value, .data$Est), size = 0.8) +
+    geom_ribbon(aes(.data$Value, ymin = .data$LCL, ymax = .data$UCL),
+                alpha = 0.3) +
+    labs(x = "",
+         y = paste(name1, "\u2013", name2, "(%)"),
+         title = "Difference in Proportions") +
+    scale_x_continuous(breaks = c(-100, -75, -50, -25, 0, 25, 50, 75, 100)) +
+    scale_y_continuous(limits = c(xmin, xmax),
+                       expand = expansion(mult = 0)) +
+    coord_flip(xlim = c(-100, 100), clip = "off") +
+    geom_vline(xintercept = 0, size = 0.6) +
+    geom_hline(yintercept = 0, linetype = 2, size = 0.6) +
+    geom_vline(xintercept = hline, linetype = 2, size = 0.2) +
+    theme_bw(base_size = 14) +
+    theme(plot.margin = margin(5.5, 5.5, 5.5, 0),
+          panel.grid = element_blank(),
+          legend.key.size = unit(0.5, "cm"),
+          axis.text = element_text(colour = "black", size = 11),
+          axis.title = element_text(face = "bold", size = 12),
+          panel.border = element_blank(),
+          axis.line = element_line(colour = "black", size = 0.5),
+          plot.title = element_text(face = "bold", size = 12, hjust = 0.5))
 }
