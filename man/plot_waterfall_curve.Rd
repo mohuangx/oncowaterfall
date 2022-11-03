@@ -9,6 +9,8 @@ plot_waterfall_curve(
   x2 = NULL,
   name1 = "Treatment",
   name2 = "Control",
+  plot_ci1 = FALSE,
+  plot_ci2 = FALSE,
   hline = 0,
   include_diff = TRUE,
   conf_level = 0.95
@@ -22,6 +24,10 @@ plot_waterfall_curve(
 \item{name1}{Name for treatment 1}
 
 \item{name2}{Name for treatment 2}
+
+\item{plot_ci1}{Whether to plot confidence interval for x1. Default is FALSE.}
+
+\item{plot_ci2}{Whether to plot confidence interval for x2. Default if FALSE.}
 
 \item{hline}{Y-coordinate for dotted line}
 

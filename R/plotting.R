@@ -55,6 +55,8 @@ plot_waterfall <- function(x, title = "") {
 #' @param x2 Vector of best tumor size changes for treatment 2
 #' @param name1 Name for treatment 1
 #' @param name2 Name for treatment 2
+#' @param plot_ci1 Whether to plot confidence interval for x1. Default is FALSE.
+#' @param plot_ci2 Whether to plot confidence interval for x2. Default if FALSE.
 #' @param hline Y-coordinate for dotted line
 #' @param include_diff Whether to include difference in proportions plot
 #' @param conf_level Confidence level for difference in proportions plot
@@ -68,14 +70,15 @@ plot_waterfall <- function(x, title = "") {
 #'
 #' @importFrom ggplot2 ggplot aes .data geom_step scale_colour_manual geom_hline
 #'   scale_x_reverse scale_y_continuous coord_cartesian labs theme_bw theme
-#'   element_blank element_text element_line margin unit
+#'   element_blank element_text element_line margin unit geom_ribbon
 #' @importFrom dplyr .data bind_rows mutate group_by slice n
 #' @importFrom stats setNames
 #' @importFrom patchwork plot_layout
 #'
 #' @export
 plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
-                                 name2 = "Control", hline = 0,
+                                 name2 = "Control", plot_ci1 = FALSE,
+                                 plot_ci2 = FALSE, hline = 0,
                                  include_diff = TRUE, conf_level = 0.95) {
   x1 <- sort(x1, decreasing = TRUE)
   x2 <- sort(x2, decreasing = TRUE)
@@ -88,8 +91,8 @@ plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
     slice(c(1:n(), n())) %>%
     mutate(ind = round((1-0:(n()-1)/(n()-1))*100, 1),
            PCHG = round(.data$PCHG))
-  p1 <- ggplot(df, aes(.data$ind, .data$PCHG, colour = .data$Treatment)) +
-    geom_step(size = 0.8) +
+  p1 <- ggplot(df) +
+    geom_step(aes(.data$ind, .data$PCHG, colour = .data$Treatment), size = 0.8) +
     scale_colour_manual(values = c("#6585b4", "#aacc6f")) +
     geom_hline(yintercept = 0) +
     geom_hline(yintercept = hline, linetype = 2, size = 0.2) +
@@ -108,6 +111,20 @@ plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
           axis.title = element_text(face = "bold", size = 12),
           panel.border = element_blank(),
           axis.line = element_line(colour = "black", size = 0.5))
+  if (plot_ci1) {
+    ci1 <- ecdf_ci(x1)
+    p1 <- p1 + geom_ribbon(data = ci1,
+                           aes(.data$Est, y = .data$Value, xmin = .data$LCL,
+                               xmax = .data$UCL),
+                           fill = "#6585b4", alpha = 0.2)
+  }
+  if (plot_ci2) {
+    ci2 <- ecdf_ci(x2)
+    p1 <- p1 + geom_ribbon(data = ci2,
+                           aes(.data$Est, y = .data$Value, xmin = .data$LCL,
+                               xmax = .data$UCL),
+                           fill = "#aacc6f", alpha = 0.2)
+  }
   if (include_diff & !is.null(x2)) {
     p2 <- plot_waterfall_diff(x1, x2, name1, name2, conf_level, hline)
     p <- p1 + p2 + plot_layout(widths = c(2, 1))
@@ -149,7 +166,7 @@ plot_waterfall_curve <- function(x1, x2 = NULL, name1 = "Treatment",
 plot_waterfall_diff <- function(x1, x2, name1 = "Treatment", name2 = "Control",
                                 conf_level = 0.95, hline = 0) {
   df_diff <- ecdf_diff(x1, x2, conf_level = conf_level) %>%
-    mutate(across(.data$Est:.data$UCL, ~ round(.x*100, 1)))
+    mutate(across(.data$Est:.data$UCL, ~ round(.x, 1)))
   xmin <- -max(abs(df_diff$LCL), abs(df_diff$UCL))
   xmax <- -xmin
   ggplot(df_diff) + geom_step(aes(.data$Value, .data$Est), size = 0.8) +
